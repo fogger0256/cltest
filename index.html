@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>圧力・液柱のつり合いシミュレータ｜理科大2002 第3問</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0e141b;
+    --bg-grid: rgba(233,227,214,0.045);
+    --panel:#151e27;
+    --panel-2:#1a2530;
+    --line:#2a3742;
+    --line-soft:#232f3a;
+    --ink:#eae4d7;
+    --muted:#8a97a3;
+    --brass:#c9873f;
+    --brass-glow:#f0a95c;
+    --liquid:#3f93b0;
+    --liquid-deep:#255c70;
+    --open:#7fae6f;
+    --closed:#b1543f;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      repeating-linear-gradient(0deg, var(--bg-grid) 0px, transparent 1px, transparent 28px, var(--bg-grid) 29px),
+      repeating-linear-gradient(90deg, var(--bg-grid) 0px, transparent 1px, transparent 28px, var(--bg-grid) 29px),
+      var(--bg);
+    color:var(--ink);
+    font-family:'Zen Kaku Gothic New', 'Noto Sans JP', sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px;}
+  header{margin-bottom:22px;}
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    letter-spacing:.18em;
+    font-size:11px;
+    color:var(--brass);
+    text-transform:uppercase;
+    margin:0 0 6px;
+  }
+  h1{
+    font-size:clamp(21px,3vw,30px);
+    font-weight:900;
+    margin:0 0 6px;
+    letter-spacing:.01em;
+  }
+  .sub{color:var(--muted);font-size:13.5px;margin:0;line-height:1.6;}
+
+  .app{display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;}
+  .diagram-col{flex:0 0 380px;}
+  .control-col{flex:1 1 480px;min-width:320px;display:flex;flex-direction:column;gap:16px;}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px 18px;
+  }
+  .panel h2{
+    font-size:12.5px;
+    letter-spacing:.10em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin:0 0 12px;
+    font-weight:700;
+    display:flex;align-items:center;gap:8px;
+  }
+  .panel h2::before{
+    content:"";
+    width:6px;height:6px;border-radius:50%;
+    background:var(--brass);
+    display:inline-block;
+  }
+
+  /* stepper */
+  .stepper{display:flex;gap:6px;margin-bottom:14px;}
+  .step{
+    flex:1;
+    text-align:center;
+    padding:8px 4px;
+    border-radius:7px;
+    border:1px solid var(--line);
+    background:var(--panel-2);
+    font-size:11.5px;
+    color:var(--muted);
+    transition:all .25s ease;
+  }
+  .step b{display:block;font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--muted);margin-bottom:2px;transition:color .25s ease;}
+  .step.active{border-color:var(--brass);background:rgba(201,135,63,0.12);color:var(--ink);}
+  .step.active b{color:var(--brass-glow);}
+
+  /* diagram */
+  .diagram-frame{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+  }
+  svg#appa{width:100%;height:auto;display:block;}
+  text{font-family:'Zen Kaku Gothic New', sans-serif;fill:var(--ink);}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .tiny{font-size:9.5px;fill:var(--muted);}
+  .val{font-size:10.5px;fill:var(--ink);font-family:'JetBrains Mono',monospace;}
+  .rect-anim{transition:y .12s linear, height .12s linear, x .12s linear, width .12s linear;}
+  .slow-anim{transition:y .8s cubic-bezier(.4,0,.2,1), height .8s cubic-bezier(.4,0,.2,1), fill .8s ease, opacity .8s ease;}
+
+  /* controls */
+  .row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+  .field{flex:1 1 120px;min-width:100px;}
+  .field label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;}
+  .field input[type=number], .field select{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--ink);
+    border-radius:6px;
+    padding:7px 8px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px;
+  }
+  .field input:focus, .field select:focus{outline:2px solid var(--brass);outline-offset:1px;}
+  .unit{color:var(--muted);font-size:11px;margin-left:4px;}
+
+  .slider-block{margin-top:6px;}
+  input[type=range]{
+    -webkit-appearance:none;
+    width:100%;
+    height:6px;
+    border-radius:3px;
+    background:linear-gradient(90deg, var(--liquid) 0%, var(--liquid) var(--pct,0%), var(--line-soft) var(--pct,0%), var(--line-soft) 100%);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:18px;height:18px;border-radius:50%;
+    background:var(--brass-glow);
+    border:2px solid #10161d;
+    cursor:pointer;
+    box-shadow:0 0 0 3px rgba(201,135,63,0.25);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px;height:18px;border-radius:50%;
+    background:var(--brass-glow);border:2px solid #10161d;cursor:pointer;
+  }
+  input[type=range]:disabled{opacity:.4;}
+  .slider-ticks{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:5px;font-family:'JetBrains Mono',monospace;}
+
+  .hint{font-size:12px;color:var(--muted);line-height:1.6;margin:10px 0 0;}
+
+  .btnrow{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;}
+  button{
+    font-family:'Zen Kaku Gothic New',sans-serif;
+    font-size:13px;
+    font-weight:700;
+    padding:10px 14px;
+    border-radius:7px;
+    border:1px solid var(--line);
+    background:var(--panel-2);
+    color:var(--ink);
+    cursor:pointer;
+    transition:all .2s ease;
+  }
+  button:hover:not(:disabled){border-color:var(--brass);color:var(--brass-glow);}
+  button:disabled{opacity:.35;cursor:not-allowed;}
+  button.primary{background:linear-gradient(180deg,#3a2c1c,#241b10);border-color:var(--brass);color:var(--brass-glow);}
+  button.primary:hover:not(:disabled){box-shadow:0 0 0 3px rgba(201,135,63,0.18);}
+
+  /* readout table */
+  table.readout{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.readout th{
+    text-align:left;color:var(--muted);font-weight:600;font-size:11px;
+    padding:4px 8px;border-bottom:1px solid var(--line);
+  }
+  table.readout td{
+    padding:6px 8px;border-bottom:1px solid var(--line-soft);
+    font-family:'JetBrains Mono',monospace;
+  }
+  table.readout td.label{font-family:'Zen Kaku Gothic New',sans-serif;color:var(--muted);}
+  table.readout tr:last-child td{border-bottom:none;}
+  .badge{
+    display:inline-block;padding:1px 7px;border-radius:99px;font-size:10px;
+    font-family:'JetBrains Mono',monospace;margin-left:6px;
+  }
+  .badge.open{background:rgba(127,174,111,.18);color:var(--open);}
+  .badge.closed{background:rgba(177,84,63,.18);color:var(--closed);}
+
+  .formula-note{
+    font-size:11.5px;color:var(--muted);
+    background:var(--panel-2);
+    border:1px dashed var(--line);
+    border-radius:8px;
+    padding:9px 11px;
+    margin-top:10px;
+    line-height:1.7;
+  }
+  .formula-note b{color:var(--ink);}
+
+  svg#pv{width:100%;height:auto;display:block;}
+  .axislabel{font-size:9.5px;fill:var(--muted);}
+
+  footer{margin-top:26px;color:var(--muted);font-size:11.5px;text-align:center;}
+  footer a{color:var(--brass);}
+
+  @media (max-width:820px){
+    .diagram-col{flex:1 1 100%;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Thermo-Hydrostatic Apparatus — Interactive Model</p>
+    <h1>圧力・体積・液柱のつり合いシミュレータ</h1>
+    <p class="sub">東京理科大学 2002年 物理 第3問／A室・B室・細管・液体の状態変化を、実際にヒーターを動かしながら確認できます。</p>
+  </header>
+
+  <div class="app">
+    <!-- ===================== DIAGRAM ===================== -->
+    <div class="diagram-col">
+      <div class="stepper" id="stepper">
+        <div class="step" data-step="1"><b>①</b>図3-1</div>
+        <div class="step" data-step="2"><b>②</b>図3-2</div>
+        <div class="step" data-step="3"><b>③</b>図3-3</div>
+        <div class="step" data-step="4"><b>④</b>図3-4</div>
+      </div>
+
+      <div class="diagram-frame">
+        <svg id="appa" viewBox="0 0 340 560" xmlns="http://www.w3.org/2000/svg">
+          <!-- outer insulation jacket -->
+          <rect id="jacket" class="slow-anim" x="38" y="52" width="184" height="452" rx="10"
+                fill="#232d38" stroke="#3a4856" stroke-width="1.5"/>
+          <text x="130" y="42" text-anchor="middle" class="tiny">断熱材（外装）</text>
+
+          <!-- cock -->
+          <g id="cockGroup">
+            <line x1="130" y1="35" x2="130" y2="80" stroke="#5b6672" stroke-width="4"/>
+            <circle id="cockBody" cx="130" cy="28" r="9" fill="var(--open)" stroke="#10161d" stroke-width="2"/>
+            <text x="150" y="32" class="tiny">コック</text>
+            <text id="cockLabel" x="130" y="20" text-anchor="middle" class="tiny mono" fill="#7fae6f">OPEN</text>
+          </g>
+          <text x="60" y="20" class="tiny">大気 P₀, T₀</text>
+
+          <!-- inner chamber outline -->
+          <rect x="70" y="80" width="120" height="400" fill="none" stroke="#425160" stroke-width="1.5"/>
+
+          <!-- A gas -->
+          <rect id="aGas" class="rect-anim" x="71" y="80" width="118" height="100" fill="#1c2732"/>
+          <!-- A liquid pool -->
+          <rect id="aPool" class="rect-anim" x="71" y="180" width="118" height="0" fill="var(--liquid)"/>
+
+          <!-- wall -->
+          <rect x="70" y="180" width="120" height="100" fill="url(#hatch)" stroke="#425160" stroke-width="1"/>
+          <text x="130" y="234" text-anchor="middle" class="tiny" transform="rotate(0 130 234)">断熱材の仕切り壁</text>
+
+          <!-- B gas -->
+          <rect id="bGas" class="rect-anim" x="71" y="280" width="118" height="200" fill="#1c2732"/>
+          <!-- B liquid pool -->
+          <rect id="bPool" class="rect-anim" x="71" y="380" width="118" height="100" fill="var(--liquid)"/>
+
+          <!-- heater coil -->
+          <path id="heater" d="M 84 300 L 92 292 L 100 308 L 108 292 L 116 308 L 124 292 L 132 308 L 140 292 L 148 300"
+                fill="none" stroke="#5b6672" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="152" y="304" class="tiny">ヒーター</text>
+
+          <!-- labels A/B -->
+          <text x="78" y="96" class="tiny" fill="#c7cfd6">A室</text>
+          <text x="78" y="296" class="tiny" fill="#c7cfd6">B室</text>
+          <text id="labelA" x="130" y="130" text-anchor="middle" class="val"></text>
+          <text id="labelB" x="130" y="330" text-anchor="middle" class="val"></text>
+
+          <!-- bypass tube -->
+          <rect x="190" y="170" width="42" height="20" fill="#2a3742" stroke="#425160" stroke-width="1"/>
+          <rect x="190" y="470" width="42" height="20" fill="#2a3742" stroke="#425160" stroke-width="1"/>
+          <rect x="222" y="180" width="20" height="300" fill="#161f28" stroke="#425160" stroke-width="1.3"/>
+          <rect id="tubeLiquid" class="rect-anim" x="223" y="380" width="18" height="100" fill="var(--liquid-deep)"/>
+          <text x="246" y="330" class="tiny" transform="rotate(90 246 330)">細管（体積無視）</text>
+
+          <!-- height reference ticks -->
+          <line x1="60" y1="80" x2="66" y2="80" stroke="#5b6672"/>
+          <line x1="60" y1="180" x2="66" y2="180" stroke="#5b6672"/>
+          <line x1="60" y1="280" x2="66" y2="280" stroke="#5b6672"/>
+          <line x1="60" y1="480" x2="66" y2="480" stroke="#5b6672"/>
+
+          <defs>
+            <pattern id="hatch" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+              <rect width="8" height="8" fill="#2c3743"/>
+              <line x1="0" y1="0" x2="0" y2="8" stroke="#425160" stroke-width="2"/>
+            </pattern>
+          </defs>
+        </svg>
+      </div>
+
+      <div class="panel" style="margin-top:14px;">
+        <h2>P–Vグラフ（B室気体）</h2>
+        <svg id="pv" viewBox="0 0 300 190" xmlns="http://www.w3.org/2000/svg">
+          <g id="pvAxes"></g>
+          <path id="pvSeg1" fill="none" stroke="var(--brass-glow)" stroke-width="2"/>
+          <path id="pvSeg2" fill="none" stroke="var(--brass-glow)" stroke-width="2"/>
+          <line id="pvDash" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3,3" opacity="0"/>
+          <circle id="pvP1" r="3.2" fill="#e9e3d6"/>
+          <circle id="pvP2" r="3.2" fill="#e9e3d6" opacity="0.55"/>
+          <circle id="pvCur" r="4.2" fill="var(--liquid)" stroke="#10161d" stroke-width="1"/>
+          <circle id="pvP4" r="3.6" fill="var(--closed)" opacity="0"/>
+          <text id="pvLbl1" class="tiny mono"></text>
+          <text id="pvLbl2" class="tiny mono"></text>
+          <text id="pvLbl4" class="tiny mono" opacity="0"></text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- ===================== CONTROLS ===================== -->
+    <div class="control-col">
+
+      <div class="panel">
+        <h2>装置パラメータ</h2>
+        <div class="row">
+          <div class="field">
+            <label>A室・B室の基準長さ L</label>
+            <input type="number" id="inL" value="20" min="2" max="60" step="1">
+            <span class="unit">cm</span>
+          </div>
+          <div class="field">
+            <label>断面積 S</label>
+            <input type="number" id="inS" value="100" min="10" max="400" step="5">
+            <span class="unit">cm²</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>液体の種類（密度ρ）</label>
+            <select id="inRho">
+              <option value="1000" selected>水（1000 kg/m³）</option>
+              <option value="789">エタノール（789 kg/m³）</option>
+              <option value="920">サラダ油（920 kg/m³）</option>
+              <option value="1260">グリセリン（1260 kg/m³）</option>
+              <option value="13600">水銀（13600 kg/m³）</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>室温 T₀</label>
+            <input type="number" id="inT0" value="27" min="-10" max="60" step="1">
+            <span class="unit">℃</span>
+          </div>
+        </div>
+        <p class="hint">大気圧 P₀ = 1.013×10⁵ Pa、重力加速度 g = 9.8 m/s²、気体は単原子分子理想気体として固定しています。</p>
+      </div>
+
+      <div class="panel">
+        <h2>プロセス制御</h2>
+        <p class="hint" style="margin-top:0;">スライダーを右へ動かすとヒーターがB室気体を加熱し、細管を通って液体がA室へ移動します。50%地点で図3-2、そこから先が図3-3（液面高さ αL）に対応します。</p>
+        <div class="slider-block">
+          <input type="range" id="slider" min="0" max="100" value="0" step="0.5">
+          <div class="slider-ticks">
+            <span>図3-1</span><span>図3-2（50%）</span><span>図3-3（お好みの位置）</span>
+          </div>
+        </div>
+        <div class="btnrow">
+          <button class="primary" id="btnClose" disabled>③→④ コックを閉じ断熱材を外して放冷する</button>
+          <button id="btnReset">① リセット</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>状態の読み取り <span id="phaseBadge" class="badge open">図3-1</span></h2>
+        <table class="readout">
+          <tr><th></th><th>A室</th><th>B室</th></tr>
+          <tr><td class="label">圧力 P</td><td id="tdPA">—</td><td id="tdPB">—</td></tr>
+          <tr><td class="label">温度 T</td><td id="tdTA">—</td><td id="tdTB">—</td></tr>
+          <tr><td class="label">気体の体積 V</td><td id="tdVA">—</td><td id="tdVB">—</td></tr>
+          <tr><td class="label">液面の高さ</td><td id="tdHA">—</td><td id="tdHB">—</td></tr>
+        </table>
+        <div class="formula-note" id="formulaNote">
+          初期状態（図3-1）：A室・B室ともに P₀, T₀ の単原子分子理想気体。B室下部に高さLの液体。
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>この図は模式図であり、寸法は正確な縮尺ではありません。断面積S・高さLは共通のスケールで両室に適用されます。</footer>
+</div>
+
+<script>
+(function(){
+  const R = 8.314;
+  const P0 = 101325; // Pa, fixed at 1 atm
+  const g = 9.8;
+  const ALPHA_MAX = 0.6;
+
+  // ---- DOM refs ----
+  const el = id => document.getElementById(id);
+  const inL = el('inL'), inS = el('inS'), inRho = el('inRho'), inT0 = el('inT0');
+  const slider = el('slider');
+  const btnClose = el('btnClose'), btnReset = el('btnReset');
+
+  const aGas = el('aGas'), aPool = el('aPool'), bGas = el('bGas'), bPool = el('bPool');
+  const tubeLiquid = el('tubeLiquid');
+  const jacket = el('jacket'), cockBody = el('cockBody'), cockLabel = el('cockLabel');
+  const heater = el('heater');
+  const labelA = el('labelA'), labelB = el('labelB');
+
+  const tdPA=el('tdPA'),tdPB=el('tdPB'),tdTA=el('tdTA'),tdTB=el('tdTB'),
+        tdVA=el('tdVA'),tdVB=el('tdVB'),tdHA=el('tdHA'),tdHB=el('tdHB');
+  const phaseBadge = el('phaseBadge');
+  const formulaNote = el('formulaNote');
+  const stepperEls = document.querySelectorAll('.step');
+
+  let cockClosed = false;
+  let alphaFinal = 0;
+  let betaFinal = 0;
+
+  // ---- helpers ----
+  function params(){
+    const L = Math.max(2, parseFloat(inL.value)||20)/100;      // m
+    const S = Math.max(10, parseFloat(inS.value)||100)*1e-4;   // m^2
+    const rho = parseFloat(inRho.value)||1000;                 // kg/m^3
+    const T0 = (parseFloat(inT0.value)||27) + 273.15;          // K
+    return {L,S,rho,T0};
+  }
+
+  function lerpColor(c1,c2,t){
+    t = Math.max(0,Math.min(1,t));
+    const p1 = c1.match(/\w\w/g).map(h=>parseInt(h,16));
+    const p2 = c2.match(/\w\w/g).map(h=>parseInt(h,16));
+    const rgb = p1.map((v,i)=>Math.round(v+(p2[i]-v)*t));
+    return '#'+rgb.map(v=>v.toString(16).padStart(2,'0')).join('');
+  }
+
+  function fmtP(pa){ return (pa/1000).toFixed(2)+' kPa'; }
+  function fmtT(K){ return K.toFixed(1)+' K ('+(K-273.15).toFixed(1)+'℃)'; }
+  function fmtV(m3){ return (m3*1000).toFixed(2)+' L'; }
+  function fmtH(m){ return (m*100).toFixed(1)+' cm'; }
+
+  // numeric bisection: solve beta from P0/(1+b) - (1-alpha)/(1-b)*P0 - 2(1+b)*rho*g*L = 0
+  function solveBeta(alpha, P0, rho, g, L){
+    function f(b){ return P0/(1+b) - ((1-alpha)/(1-b))*P0 - 2*(1+b)*rho*g*L; }
+    let lo=0, hi=0.995;
+    if (f(lo) <= 0) return 0;
+    for(let i=0;i<80;i++){
+      const mid=(lo+hi)/2;
+      if (f(mid) > 0) lo=mid; else hi=mid;
+    }
+    return (lo+hi)/2;
+  }
+
+  // ---- core physics for current slider position ----
+  function computeState(){
+    const {L,S,rho,T0} = params();
+    const P2 = P0 + 2*rho*g*L;
+    const T2 = T0 * P2/P0;
+    const V1 = S*L;
+
+    const sv = parseFloat(slider.value);
+    let phase, alpha=0, P_B, V_B, T_B, frontHL;
+
+    if (sv <= 50){
+      phase = (sv===0)?'state1':(sv===50?'state2':'phase1');
+      const t1 = sv/50;
+      P_B = P0 + t1*(P2-P0);
+      V_B = V1;
+      T_B = T0 * P_B/P0;
+      frontHL = 1 + 2*t1; // 1..3 (in units of L, measured from B floor)
+    } else {
+      phase = (sv===100)?'state3':'phase2';
+      const t2 = (sv-50)/50;
+      alpha = t2*ALPHA_MAX;
+      P_B = P0 + 2*rho*g*L*(1+alpha);
+      V_B = S*(1+alpha)*L;
+      T_B = (1+alpha)*(P_B/P0)*T0;
+      frontHL = 3;
+    }
+
+    const P_A = P0, T_A = T0;
+    const poolA_L = alpha;          // height of liquid in A, units of L
+    const poolB_L = 1 - alpha;      // height of liquid in B, units of L
+    const V_A = S*(1-alpha)*L;
+
+    return {L,S,rho,T0,P0,P2,T2,V1,phase,alpha,P_B,V_B,T_B,P_A,T_A,V_A,poolA_L,poolB_L,frontHL};
+  }
+
+  function computeFinalState(){
+    const {L,S,rho,T0} = params();
+    const beta = solveBeta(alphaFinal, P0, rho, g, L);
+    const P_A = (1-alphaFinal)/(1-beta) * P0;
+    const P_B = P0/(1+beta);
+    return {beta,P_A,P_B,T_A:T0,T_B:T0,L,S,rho,T0,poolA_L:beta,poolB_L:1-beta,
+             V_A:S*(1-beta)*L, V_B:S*(1+beta)*L};
+  }
+
+  // ---- SVG drawing ----
+  const Y_BASE = 480, PX_PER_L = 100;
+  function yOf(hL){ return Y_BASE - hL*PX_PER_L; }
+
+  function drawApparatus(st, opts){
+    opts = opts || {};
+    const poolA_L = Math.min(0.94, Math.max(0, st.poolA_L));
+    const poolB_L = Math.min(1, Math.max(0.02, st.poolB_L));
+
+    // A: gas above (y=80..yFloorA-poolA_px), pool below
+    const poolA_px = poolA_L*PX_PER_L;
+    aGas.setAttribute('y', 80);
+    aGas.setAttribute('height', Math.max(0, 100 - poolA_px));
+    aPool.setAttribute('y', 180 - poolA_px);
+    aPool.setAttribute('height', poolA_px);
+
+    // B: gas above, pool below
+    const poolB_px = poolB_L*PX_PER_L;
+    bGas.setAttribute('y', 280);
+    bGas.setAttribute('height', Math.max(0, 200 - poolB_px));
+    bPool.setAttribute('y', 480 - poolB_px);
+    bPool.setAttribute('height', poolB_px);
+
+    // tube liquid fill
+    let frontY;
+    if (opts.tubeFull===false){
+      frontY = yOf(st.frontHL);
+    } else {
+      frontY = 180; // fully filled once phase2/state3/state4
+    }
+    tubeLiquid.setAttribute('y', frontY);
+    tubeLiquid.setAttribute('height', Math.max(0, 480-frontY));
+
+    // labels
+    labelA.textContent = fmtP(st.P_A)+' / '+st.T_A.toFixed(0)+'K';
+    labelB.textContent = fmtP(st.P_B)+' / '+st.T_B.toFixed(0)+'K';
+
+    // cock
+    if (cockClosed){
+      cockBody.setAttribute('fill','var(--closed)');
+      cockLabel.textContent='CLOSED';
+      cockLabel.setAttribute('fill','#b1543f');
+      jacket.setAttribute('opacity','0.28');
+      jacket.setAttribute('stroke-dasharray','5,4');
+    } else {
+      cockBody.setAttribute('fill','var(--open)');
+      cockLabel.textContent='OPEN';
+      cockLabel.setAttribute('fill','#7fae6f');
+      jacket.setAttribute('opacity','1');
+      jacket.setAttribute('stroke-dasharray','none');
+    }
+
+    // heater glow based on B temperature
+    const {T0,T2} = params.__cache || {};
+  }
+
+  function heaterColor(T_B, T0, T3max){
+    const t = cockClosed ? 0 : Math.max(0, Math.min(1, (T_B-T0)/Math.max(1,(T3max-T0))));
+    return lerpColor('#5b6672', '#f0a95c', t);
+  }
+
+  // ---- PV graph ----
+  const pvNS='http://www.w3.org/2000/svg';
+  function drawPV(st, finalSt){
+    const {L,S,rho,T0,P0,P2,V1} = st;
+    const P3max = P0 + 2*rho*g*L*(1+ALPHA_MAX);
+    const V3max = S*(1+ALPHA_MAX)*L;
+
+    const Vmin = V1*0.8, Vmax = V3max*1.1;
+    const Pmin = P0*0.985, Pmax = P3max*1.03;
+
+    const margin = {l:44,r:14,t:12,b:26};
+    const pw = 300-margin.l-margin.r, ph=190-margin.t-margin.b;
+    const xs = v => margin.l + (v-Vmin)/(Vmax-Vmin)*pw;
+    const ys = p => margin.t + (1-(p-Pmin)/(Pmax-Pmin))*ph;
+
+    // axes (rebuild each time params change is fine, cheap)
+    const axG = el('pvAxes');
+    axG.innerHTML='';
+    const mkLine=(x1,y1,x2,y2,cls)=>{
+      const l=document.createElementNS(pvNS,'line');
+      l.setAttribute('x1',x1);l.setAttribute('y1',y1);l.setAttribute('x2',x2);l.setAttribute('y2',y2);
+      l.setAttribute('stroke','#2a3742');l.setAttribute('stroke-width','1');
+      axG.appendChild(l);
+    };
+    mkLine(margin.l,margin.t,margin.l,190-margin.b);
+    mkLine(margin.l,190-margin.b,300-margin.r,190-margin.b);
+    const mkText=(x,y,s,anchor)=>{
+      const t=document.createElementNS(pvNS,'text');
+      t.setAttribute('x',x);t.setAttribute('y',y);
+      t.setAttribute('class','axislabel');
+      t.setAttribute('text-anchor',anchor||'middle');
+      t.textContent=s;
+      axG.appendChild(t);
+    };
+    mkText(margin.l-6, 190-margin.b+10, '0', 'start');
+    mkText(margin.l, 190-14, 'V [L]', 'start');
+    mkText(margin.l-38, margin.t+6, 'P[kPa]', 'start');
+    mkText(margin.l-8, ys(P0)+3, (P0/1000).toFixed(0), 'end');
+    mkText(margin.l-8, ys(P3max)+3, (P3max/1000).toFixed(0), 'end');
+    mkText(xs(V1*1000), 190-margin.b+20, (V1*1000).toFixed(1), 'middle');
+    mkText(xs(V3max*1000), 190-margin.b+20, (V3max*1000).toFixed(1), 'middle');
+
+    // points
+    const V1L=V1*1000;
+    el('pvP1').setAttribute('cx', xs(V1L)); el('pvP1').setAttribute('cy', ys(P0));
+    el('pvLbl1').setAttribute('x', xs(V1L)+6); el('pvLbl1').setAttribute('y', ys(P0)-5); el('pvLbl1').textContent='①';
+
+    el('pvP2').setAttribute('cx', xs(V1L)); el('pvP2').setAttribute('cy', ys(P2));
+    el('pvLbl2').setAttribute('x', xs(V1L)+6); el('pvLbl2').setAttribute('y', ys(P2)-5); el('pvLbl2').textContent='②';
+
+    // seg1: state1 -> current(if phase1) or state2 (fixed)
+    const sv=parseFloat(slider.value);
+    const curP = st.P_B, curV = st.V_B*1000;
+    const seg1TopP = (sv<=50)? curP : P2;
+    const seg1 = el('pvSeg1');
+    seg1.setAttribute('d', `M ${xs(V1L)} ${ys(P0)} L ${xs(V1L)} ${ys(seg1TopP)}`);
+
+    // seg2: state2 -> current (only meaningful once sv>50)
+    const seg2 = el('pvSeg2');
+    if (sv>50){
+      seg2.setAttribute('d', `M ${xs(V1L)} ${ys(P2)} L ${xs(curV)} ${ys(curP)}`);
+      seg2.setAttribute('opacity','1');
+    } else {
+      seg2.setAttribute('opacity','0');
+    }
+
+    // current marker
+    el('pvCur').setAttribute('cx', xs(curV));
+    el('pvCur').setAttribute('cy', ys(curP));
+
+    // final state marker
+    const p4 = el('pvP4'), l4 = el('pvLbl4'), dash = el('pvDash');
+    if (cockClosed && finalSt){
+      const V4L = finalSt.V_B*1000;
+      p4.setAttribute('cx', xs(V4L)); p4.setAttribute('cy', ys(finalSt.P_B)); p4.setAttribute('opacity','1');
+      l4.setAttribute('x', xs(V4L)+6); l4.setAttribute('y', ys(finalSt.P_B)-5); l4.textContent='④'; l4.setAttribute('opacity','1');
+      dash.setAttribute('x1', xs(curV)); dash.setAttribute('y1', ys(curP));
+      dash.setAttribute('x2', xs(V4L)); dash.setAttribute('y2', ys(finalSt.P_B));
+      dash.setAttribute('opacity','0.6');
+    } else {
+      p4.setAttribute('opacity','0'); l4.setAttribute('opacity','0'); dash.setAttribute('opacity','0');
+    }
+  }
+
+  // ---- stepper ----
+  function updateStepper(){
+    const sv = parseFloat(slider.value);
+    stepperEls.forEach(s=>s.classList.remove('active'));
+    if (cockClosed){
+      document.querySelector('.step[data-step="4"]').classList.add('active');
+    } else if (sv===0){
+      document.querySelector('.step[data-step="1"]').classList.add('active');
+    } else if (sv<=50){
+      document.querySelector('.step[data-step="2"]').classList.add('active');
+    } else {
+      document.querySelector('.step[data-step="3"]').classList.add('active');
+    }
+  }
+
+  // ---- main render ----
+  function render(){
+    const st = computeState();
+    const P3max = P0 + 2*st.rho*g*st.L*(1+ALPHA_MAX);
+    const T3max = (1+ALPHA_MAX)*(P3max/P0)*st.T0;
+
+    let finalSt = null;
+    if (cockClosed){
+      finalSt = computeFinalState();
+    }
+
+    const shown = cockClosed ? {
+      P_A: finalSt.P_A, T_A: finalSt.T_A, V_A: finalSt.V_A, poolA_L: finalSt.poolA_L,
+      P_B: finalSt.P_B, T_B: finalSt.T_B, V_B: finalSt.V_B, poolB_L: finalSt.poolB_L,
+      frontHL: 3, L: st.L, S: st.S
+    } : st;
+
+    drawApparatus(shown, {tubeFull: !(st.phase==='phase1' || st.phase==='state1')});
+
+    heater.setAttribute('stroke', heaterColor(shown.T_B, st.T0, T3max));
+    heater.setAttribute('opacity', cockClosed ? 0.35 : 1);
+
+    // readout
+    tdPA.textContent = fmtP(shown.P_A);
+    tdPB.textContent = fmtP(shown.P_B);
+    tdTA.textContent = fmtT(shown.T_A);
+    tdTB.textContent = fmtT(shown.T_B);
+    tdVA.textContent = fmtV(shown.V_A);
+    tdVB.textContent = fmtV(shown.V_B);
+    tdHA.textContent = fmtH(shown.poolA_L*st.L);
+    tdHB.textContent = fmtH(shown.poolB_L*st.L);
+
+    // badge + note
+    const sv = parseFloat(slider.value);
+    if (cockClosed){
+      phaseBadge.textContent='図3-4（放冷後）';
+      phaseBadge.className='badge closed';
+      formulaNote.innerHTML = `コック閉・断熱材撤去→放冷。<b>β = ${finalSt.beta.toFixed(4)}</b>（数値計算）。
+        P_A = (1-α)/(1-β)·P₀ = <b>${fmtP(finalSt.P_A)}</b>、
+        P_B = P₀/(1+β) = <b>${fmtP(finalSt.P_B)}</b>。使用した α_final = ${alphaFinal.toFixed(3)}`;
+    } else if (sv===0){
+      phaseBadge.textContent='図3-1（初期状態）';
+      phaseBadge.className='badge open';
+      formulaNote.textContent = '初期状態：A室・B室ともに P₀, T₀ の単原子分子理想気体。B室下部に高さLの液体。';
+    } else if (sv<=50){
+      phaseBadge.textContent='図3-1 → 図3-2（定積変化）';
+      phaseBadge.className='badge open';
+      formulaNote.innerHTML = `B室気体を体積一定 (V=SL) で加熱中。P_B = P₀ + t×2ρgL。到達目標 <b>P₂ = P₀+2ρgL = ${fmtP(st.P2)}</b>`;
+    } else {
+      phaseBadge.textContent='図3-2 → 図3-3（液体がA室へ流入）';
+      phaseBadge.className='badge open';
+      formulaNote.innerHTML = `α = ${st.alpha.toFixed(3)} まで進行。P_B = P₀+2ρgL(1+α) = <b>${fmtP(st.P_B)}</b>、
+        T_B = (1+α)(P_B/P₀)T₀ = <b>${st.T_B.toFixed(1)} K</b>`;
+    }
+
+    btnClose.disabled = cockClosed || sv < 50;
+
+    drawPV(st, finalSt);
+    updateStepper();
+
+    // slider fill
+    slider.style.setProperty('--pct', sv+'%');
+  }
+
+  // ---- events ----
+  slider.addEventListener('input', ()=>{
+    if (cockClosed) return;
+    render();
+  });
+
+  btnClose.addEventListener('click', ()=>{
+    if (cockClosed) return;
+    const st = computeState();
+    alphaFinal = st.alpha;
+    cockClosed = true;
+    slider.disabled = true;
+    // trigger slow transition
+    [aGas,aPool,bGas,bPool,tubeLiquid,jacket].forEach(n=>n.classList.add('slow-anim'));
+    render();
+  });
+
+  btnReset.addEventListener('click', ()=>{
+    cockClosed = false;
+    alphaFinal = 0; betaFinal = 0;
+    slider.disabled = false;
+    slider.value = 0;
+    render();
+  });
+
+  [inL,inS,inRho,inT0].forEach(inp=>inp.addEventListener('input', ()=>{
+    if (cockClosed){ // recompute final state with new params but same alphaFinal
+      render();
+    } else {
+      render();
+    }
+  }));
+
+  render();
+})();
+</script>
+</body>
+</html>
